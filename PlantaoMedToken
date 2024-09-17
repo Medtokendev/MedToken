@@ -1,0 +1,94 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.27;
+
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+abstract contract PlantaoMedToken is ERC721, Ownable {
+
+    struct Plantao {
+        uint id;
+        string medico;
+        string crm; // Número do CRM do médico
+        string crmRegional; // Regional do CRM (estado)
+        string hospital;
+        address gestorEscala; // Endereço do gestor de escala ou hospital
+        uint dataPlantao; // Data do plantão (Unix timestamp)
+        uint dataRealizacao; // Data da realização do plantão
+        uint dataEstimadaPagamento; // Data estimada de pagamento (Unix timestamp)
+        uint valor; // Valor do plantão
+        bool realizado; // Indica se o plantão foi realizado
+        address detentorDireitoCreditorio; // Quem tem direito ao pagamento após a realização
+    }
+
+    uint public nextPlantaoId;
+    mapping(uint => Plantao) public plantoes;
+
+    event PlantaoCriado(
+        uint indexed id,
+        string medico,
+        string crm,
+        string crmRegional,
+        string hospital,
+        address gestorEscala,
+        uint dataPlantao,
+        uint dataEstimadaPagamento,
+        uint valor
+    );
+
+    // Construtor atualizado para incluir o proprietário inicial
+    constructor(address _owner) ERC721("PlantaoMedToken", "PMT") {
+        transferOwnership(_owner); // Define o proprietário inicial
+    }
+
+    // Função para criar um novo plantão
+    function criarPlantao(
+        string memory _medico,
+        string memory _crm,
+        string memory _crmRegional,
+        string memory _hospital,
+        address _gestorEscala,
+        uint _dataPlantao,
+        uint _dataEstimadaPagamento,
+        uint _valor
+    ) public onlyOwner {
+        Plantao memory newPlantao = Plantao({
+            id: nextPlantaoId,
+            medico: _medico,
+            crm: _crm,
+            crmRegional: _crmRegional,
+            hospital: _hospital,
+            gestorEscala: _gestorEscala,
+            dataPlantao: _dataPlantao,
+            dataRealizacao: 0, // Inicialmente, sem data de realização
+            dataEstimadaPagamento: _dataEstimadaPagamento,
+            valor: _valor,
+            realizado: false,
+            detentorDireitoCreditorio: address(0) // Inicialmente, sem detentor do direito
+        });
+
+        plantoes[nextPlantaoId] = newPlantao;
+        emit PlantaoCriado(
+            nextPlantaoId,
+            _medico,
+            _crm,
+            _crmRegional,
+            _hospital,
+            _gestorEscala,
+            _dataPlantao,
+            _dataEstimadaPagamento,
+            _valor
+        );
+
+        nextPlantaoId++;
+    }
+
+    // Função para marcar um plantão como realizado e definir o detentor do direito creditorio
+    function realizarPlantao(uint _plantaoId, address _detentorDireitoCreditorio) public onlyOwner {
+        Plantao storage plantao = plantoes[_plantaoId];
+        require(!plantao.realizado, "Plantao ja foi realizado.");
+        plantao.realizado = true;
+        plantao.dataRealizacao = block.timestamp; // Data de realização do plantão
+        plantao.detentorDireitoCreditorio = _detentorDireitoCreditorio;
+    }
+}
